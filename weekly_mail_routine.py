@@ -113,18 +113,29 @@ def get_new_emails(gmail_service):
                 if data:
                     body = base64.urlsafe_b64decode(data).decode('utf-8')
 
-            # 본문에서 불필요한 부분 제거 (이전 메일 포함 제외)
-            if '\n\n---' in body:
-                body = body.split('\n\n---')[0]
-            if 'On ' in body and 'wrote:' in body:
-                lines = body.split('\n')
-                body = '\n'.join([l for l in lines if not l.startswith('>')])
+            # 본문에서 이전 메일(reply) 제외
+            # 회신/전달 구분 (일반적인 패턴들)
+            reply_patterns = [
+                '\n\n---',  # 대시 구분선
+                '\n\nOn ',  # Gmail 회신 패턴
+                '\n\n-----Original Message-----',  # Outlook 패턴
+                '\n> ',  # 인용 메일
+                '\n\nSent from',  # 서명 이후
+            ]
+
+            for pattern in reply_patterns:
+                if pattern in body:
+                    body = body.split(pattern)[0]
+                    break
+
+            # 트레일링 공백 제거
+            body = body.strip()
 
             emails.append({
                 'subject': subject,
                 'sender_name': sender_name,
                 'date': date,
-                'body': body[:500] if body else '본문 없음'
+                'body': body if body else '본문 없음'
             })
 
         return emails
