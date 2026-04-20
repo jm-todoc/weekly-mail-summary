@@ -181,24 +181,34 @@ def upload_to_drive(drive_service, md_content, folder_id):
         return None
 
 def create_calendar_event(calendar_service, doc_link, email_count):
-    """Google Calendar에 이벤트 추가"""
+    """Google Calendar에 이벤트 추가 (금요일 9시~9시30분)"""
     try:
+        # Seoul 기준 다음 금요일 9시 계산
+        now = datetime.now()
+        days_ahead = 4 - now.weekday()  # 4 = Friday
+        if days_ahead <= 0:
+            days_ahead += 7
+
+        friday_9am = now + timedelta(days=days_ahead)
+        friday_9am = friday_9am.replace(hour=9, minute=0, second=0, microsecond=0)
+        friday_930am = friday_9am + timedelta(minutes=30)
+
         event = {
             'summary': f'주간 메일 요약 ({email_count}개)',
             'description': f'주간 메일 요약 보고서\n문서 링크: {doc_link}',
             'start': {
-                'dateTime': datetime.now().isoformat(),
+                'dateTime': friday_9am.isoformat(),
                 'timeZone': 'Asia/Seoul',
             },
             'end': {
-                'dateTime': (datetime.now() + timedelta(hours=1)).isoformat(),
+                'dateTime': friday_930am.isoformat(),
                 'timeZone': 'Asia/Seoul',
             },
             'visibility': 'private',
         }
 
         event = calendar_service.events().insert(calendarId='primary', body=event).execute()
-        print(f"Calendar 이벤트 생성 완료")
+        print(f"Calendar 이벤트 생성 완료: 금요일 9시~9시30분")
         return True
 
     except Exception as e:
