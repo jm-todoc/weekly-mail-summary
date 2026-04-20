@@ -15,9 +15,6 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 import googleapiclient.discovery as discovery
 from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
-from docx import Document
-from docx.shared import Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # 설정
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly',
@@ -136,51 +133,40 @@ def get_new_emails(gmail_service):
         print(f"이메일 조회 오류: {e}")
         return []
 
-def create_word_report(emails):
-    """Word 문서 생성"""
-    doc = Document()
+def create_markdown_report(emails):
+    """Markdown 문서 생성"""
+    md_content = f"""# 주간 메일 요약
 
-    # 제목
-    title = doc.add_heading('주간 메일 요약', 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+**생성일**: {datetime.now().strftime("%Y년 %m월 %d일 %H:%M:%S")}
 
-    # 기간
-    period = doc.add_paragraph()
-    period.add_run('생성일: ').bold = True
-    period.add_run(datetime.now().strftime("%Y년 %m월 %d일 %H:%M:%S"))
-    period.alignment = WD_ALIGN_PARAGRAPH.CENTER
+## 총 {len(emails)}개 메일 요약
 
-    doc.add_paragraph()
+"""
 
-    # 요약 통계
-    doc.add_heading(f'총 {len(emails)}개 메일 요약', level=1)
-    doc.add_paragraph()
-
-    # 메일 상세
     for i, email in enumerate(emails, 1):
-        doc.add_heading(f"{i}. {email['subject']}", level=2)
-        doc.add_paragraph(f"발신자: {email['sender_name']}")
-        doc.add_paragraph(f"날짜: {email['date']}")
-        doc.add_paragraph(f"내용: {email['body']}")
-        doc.add_paragraph()
+        md_content += f"""### {i}. {email['subject']}
 
-    return doc
+- **발신자**: {email['sender_name']}
+- **날짜**: {email['date']}
+- **내용**: {email['body']}
 
-def upload_to_drive(drive_service, doc, folder_id):
-    """Google Drive에 파일 업로드"""
+"""
+
+    return md_content
+
+def upload_to_drive(drive_service, md_content, folder_id):
+    """Google Drive에 Markdown 파일 업로드"""
     try:
-        # Word 파일을 메모리에 저장
-        file_name = f"Weekly_Mail_Summary_{datetime.now().strftime('%Y_%m_%d')}.docx"
-        file_buffer = io.BytesIO()
-        doc.save(file_buffer)
-        file_buffer.seek(0)
+        file_name = f"Weekly_Mail_Summary_{datetime.now().strftime('%Y_%m_%d')}.md"
+        file_buffer = io.BytesIO(md_content.encode('utf-8'))
 
         file_metadata = {
             'name': file_name,
-            'parents': [folder_id]
+            'parents': [folder_id],
+            'mimeType': 'text/markdown'
         }
 
-        media = MediaIoBaseUpload(file_buffer, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        media = MediaIoBaseUpload(file_buffer, mimetype='text/markdown')
         file = drive_service.files().create(
             body=file_metadata,
             media_body=media,
@@ -240,13 +226,13 @@ def main():
 
         print(f"신규 메일 {len(emails)}개 발견")
 
-        # Word 문서 생성
-        print("Word 문서 생성 중...")
-        doc = create_word_report(emails)
+        # Markdown 문서 생성
+        print("Markdown 문서 생성 중...")
+        md_content = create_markdown_report(emails)
 
         # Google Drive 업로드
         print("Google Drive 업로드 중...")
-        doc_link = upload_to_drive(drive, doc, MAIL_FOLDER_ID)
+        doc_link = upload_to_drive(drive, md_content, MAIL_FOLDER_ID)
 
         if not doc_link:
             print("Drive 업로드 실패")
